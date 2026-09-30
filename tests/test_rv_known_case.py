@@ -92,3 +92,23 @@ def test_fully_missing_day_is_present_and_flagged():
     row = out.loc[pd.Timestamp(DAY).date()]
     assert row["n_missing"] == 1440 and row["n_obs"] == 0
     assert np.isnan(row["rv5"]) and row["flag"]
+
+
+def test_daily_return_equals_sum_of_5min_returns():
+    rng = np.random.default_rng(7)
+    d0 = pd.Timestamp("2021-03-09 23:59", tz="UTC")
+    idx = pd.date_range(d0, periods=1 + 2 * 1440, freq="min")
+    close = 100 * np.exp(np.cumsum(rng.normal(0, 1e-3, len(idx))))
+    bars = pd.DataFrame({"close": close}, index=idx)
+    out = daily_rv(bars, "2021-03-10", "2021-03-11").set_index("date")
+    c = pd.Series(close, index=idx)
+    for day in ["2021-03-10", "2021-03-11"]:
+        d = pd.Timestamp(day, tz="UTC")
+        expected = np.log(c[d + pd.Timedelta(minutes=1439)] / c[d - pd.Timedelta(minutes=1)])
+        assert np.isclose(out.loc[d.date(), "ret"], expected, rtol=1e-12)
+
+
+def test_daily_return_nan_without_ffill():
+    prices = {m: 100.0 for m in range(1439)}  # bar 23:59 missing
+    out = daily_rv(_bars_for_day(prices, prev_close=100.0), DAY, DAY).iloc[0]
+    assert np.isnan(out["ret"])

@@ -42,7 +42,7 @@ def test_monotonic_dates(table):
 
 
 def test_columns(table):
-    assert list(table.columns) == ["date", "rv5", "n_obs", "n_missing", "flag"]
+    assert list(table.columns) == ["date", "rv5", "n_obs", "n_missing", "flag", "ret"]
 
 
 def test_dedupe_exact_and_conflicting():

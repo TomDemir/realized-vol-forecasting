@@ -14,6 +14,9 @@ Conventions
 * 5-min log return r_t = log P_t - log P_{t-5min}. Day D uses the 288 returns
   whose end points fall in (D 00:00, D+1 00:00]; the first one starts from the
   close of the last bar of D-1.
+* ret = daily close-to-close log return on the UTC day: log close(D) -
+  log close(D-1), close(D) = close of the bar opened at D 23:59. NaN if either
+  bar is missing (no forward fill).
 * 1m bars whose open_time is not a whole minute (one block in 2018-02, see
   read_month_zip) are dropped, not snapped, and count as missing minutes.
 * No forward fill: if either end point is missing, the return is missing and not
@@ -96,7 +99,7 @@ def read_month_zip(path: Path) -> pd.DataFrame:
     # Bars whose open_time is not on the 1m UTC grid are NOT snapped to the
     # minute: they are dropped and therefore counted as missing minutes.
     # Known case: 2018-02-09 09:59:14.789 .. 2018-02-10 05:59:14.789 (1201 bars
-    # offset by +14.789 s after the 2018-02-08 exchange halt).
+    # offset by +14.789 s).
     off_grid = out.index != out.index.floor("min")
     if off_grid.any():
         offs = sorted(set((out.index[off_grid] - out.index[off_grid].floor("min")).total_seconds()))
@@ -170,11 +173,19 @@ def daily_rv(bars: pd.DataFrame, start: str | None = None, end: str | None = Non
     rv5 = np.square(r).groupby(day_of_r).sum(min_count=1)  # NaN if no valid return
     n_obs = r.groupby(day_of_r).count()
 
+    # --- daily close-to-close log return, no forward fill ---------------------
+    # Close of day D = close of the 1m bar opened at D 23:59 (= grid price at
+    # D+1 00:00). ret(D) = log close(D) - log close(D-1); NaN if either close is
+    # missing. It spans exactly the same interval as the 288 returns of rv5.
+    day_end = days + pd.Timedelta(days=1)
+    ret = pd.Series(logp.reindex(day_end).to_numpy() - logp.reindex(days).to_numpy(), index=days)
+
     out = pd.DataFrame(index=days)
     out["rv5"] = rv5.reindex(days)
     out["n_obs"] = n_obs.reindex(days, fill_value=0).astype(int)
     out["n_missing"] = n_missing.astype(int)
     out["flag"] = out["n_missing"] > MISSING_THRESHOLD * MINUTES_PER_DAY
+    out["ret"] = ret
     out.index = out.index.date
     out.index.name = "date"
     return out.reset_index()
