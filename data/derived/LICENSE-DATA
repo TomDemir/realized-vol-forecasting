@@ -1,0 +1,27 @@
+Data license for the files in data/derived/
+============================================
+
+The derived datasets in this directory (including btcusdt_rv5_daily.csv and
+btcusdt_rv5_excluded_days.csv) are licensed under the
+Creative Commons Attribution-NonCommercial-ShareAlike 4.0 International
+license (CC BY-NC-SA 4.0).
+
+  Full text: https://creativecommons.org/licenses/by-nc-sa/4.0/legalcode
+  Summary:   https://creativecommons.org/licenses/by-nc-sa/4.0/
+
+Attribution
+-----------
+Source: Binance Vision (data.binance.vision)
+
+The files are computed by this project from the public BTCUSDT spot 1-minute
+kline archives published at https://data.binance.vision/ . The computation
+(scripts/build_rv.py) is the work of the repository author. The upstream data
+provider has not reviewed, endorsed or sponsored this project or these files.
+
+Scope
+-----
+This license applies to the data files in data/derived/ only. The source code
+of this repository is covered by the MIT license in the LICENSE file at the
+repository root. Raw upstream files (data/raw/) are not redistributed here.
+
+The data is provided "as is", without warranty of any kind.

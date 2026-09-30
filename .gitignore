@@ -216,3 +216,6 @@ __marimo__/
 
 # Streamlit
 .streamlit/secrets.toml
+
+# Raw market data (downloaded by scripts/download.py, never committed)
+data/raw/
