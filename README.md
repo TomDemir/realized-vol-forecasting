@@ -26,7 +26,7 @@ python scripts/evaluate.py                 # -> metrics, DM tests, ablation tabl
 python scripts/diagnose_day.py --day 2023-08-12   # -> results/diagnostic_2023-08-12*.csv (reads data/raw)
 python scripts/plot_2024.py                # -> results/forecast_vs_realized_2024.png
 python scripts/update_readme_results.py    # copies results/ tables into this README
-pytest
+python -m pytest                           # same interpreter as the scripts above
 ```
 
 ## Data
