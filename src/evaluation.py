@@ -64,7 +64,7 @@ def diebold_mariano(loss_model: np.ndarray, loss_bench: np.ndarray) -> dict:
     lag = nw_lag(T)
     lrv = newey_west_lrv(d, lag)
     stat = d.mean() / math.sqrt(lrv / T)
-    p = 2 * (1 - stats.norm.cdf(abs(stat)))
+    p = 2 * stats.norm.sf(abs(stat))  # survival function: no underflow to 0 for large |stat|
     return {"T": T, "nw_lag": lag, "mean_d": d.mean(), "dm_stat": stat, "p_value": p,
             "sign": int(np.sign(stat))}
 
