@@ -1,0 +1,17 @@
+{
+  "rule": "MLP-QLIKE is declared better only if it beats HAR AND Linear-QLIKE on QLIKE (DM statistic < 0, p < 0.05)",
+  "beats_HAR": true,
+  "beats_Linear-QLIKE": false,
+  "mlp_declared_better": false,
+  "n_evaluable": 2423,
+  "seed_qlike_range": {
+    "MLP-QLIKE": [
+      0.28655956422389284,
+      0.30093125280863736
+    ],
+    "Linear-QLIKE": [
+      0.2859221740768891,
+      0.2898802995441994
+    ]
+  }
+}
