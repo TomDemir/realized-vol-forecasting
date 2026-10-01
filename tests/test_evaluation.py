@@ -61,3 +61,17 @@ def test_common_mask_excludes_flagged_for_all():
     df = pd.DataFrame({"rv5": [1.0, 1.0, 1.0, 1.0], "flag": [False, True, False, False]}, index=idx)
     fc = pd.DataFrame({"A": [1.0, 1.0, np.nan, 1.0], "B": [1.0, 1.0, 1.0, 1.0]}, index=idx)
     assert common_mask(fc, df).tolist() == [True, False, False, True]
+
+
+def test_holm_hand_and_statsmodels():
+    from statsmodels.stats.multitest import multipletests
+
+    from src.evaluation import holm
+    p = np.array([0.01, 0.04, 0.03, 0.005])
+    # sorted: 0.005*4=0.02, 0.01*3=0.03, 0.03*2=0.06, 0.04*1=0.04 -> monotone: 0.06
+    assert np.allclose(holm(p), [0.03, 0.06, 0.06, 0.02])
+    rng = np.random.default_rng(0)
+    q = rng.uniform(0, 0.2, 13)
+    assert np.allclose(holm(q), multipletests(q, method="holm")[1])
+    r = holm(np.array([0.2, np.nan, 0.01]))
+    assert np.isnan(r[1]) and np.allclose(r[[0, 2]], [0.2, 0.02])

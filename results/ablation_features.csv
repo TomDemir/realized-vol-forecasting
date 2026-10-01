@@ -1,0 +1,5 @@
+comparison,model,ingredient,vs,QLIKE,QLIKE_vs,MSE,MSE_vs,dm_QLIKE,p_QLIKE,p_holm_QLIKE,dm_MSE,p_MSE,p_holm_MSE,T,nw_lag
+a,HAR-log-QLIKE+dow,+ weekday of t+1 only,HAR-log-QLIKE,0.286161,0.331411,8.59381e-06,8.71154e-06,-11.2389,2.62629e-29,2.10103e-28,-0.743907,0.456933,1,2423,8
+b,HAR-log-QLIKE+ret,"+ r_t and min(r_t, 0) only",HAR-log-QLIKE,0.328523,0.331411,2.44889e-05,8.71154e-06,-0.722526,0.469971,1,1.01095,0.312039,1,2423,8
+c vs a,Linear-QLIKE-GLM,"both (adds r_t, min(r_t, 0) to a)",HAR-log-QLIKE+dow,0.282671,0.286161,3.10733e-05,8.59381e-06,-1.13138,0.257896,1,1.01368,0.310734,1,2423,8
+c vs b,Linear-QLIKE-GLM,both (adds weekday to b),HAR-log-QLIKE+ret,0.282671,0.328523,3.10733e-05,2.44889e-05,-10.5349,5.96324e-26,4.17427e-25,1.02288,0.306365,1,2423,8

@@ -1,0 +1,26 @@
+{
+  "HAR-log-OLS": {
+    "n_not_converged": null,
+    "n_refits": 2435
+  },
+  "HAR-log-QLIKE": {
+    "n_not_converged": 0,
+    "n_refits": 2435
+  },
+  "Linear-QLIKE-GLM": {
+    "n_not_converged": 0,
+    "n_refits": 2435
+  },
+  "Linear-QLIKE-GLM-22": {
+    "n_not_converged": 0,
+    "n_refits": 111
+  },
+  "HAR-log-QLIKE+dow": {
+    "n_not_converged": 0,
+    "n_refits": 2435
+  },
+  "HAR-log-QLIKE+ret": {
+    "n_not_converged": 0,
+    "n_refits": 2435
+  }
+}
