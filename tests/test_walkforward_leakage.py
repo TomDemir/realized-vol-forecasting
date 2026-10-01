@@ -4,6 +4,7 @@ import pandas as pd
 import pytest
 
 from src.data import DEFAULT_CSV, add_rv_adj, load_daily
+from src.ablation import HARLogOLS, HARLogQLIKE, LinearQLIKEGLM
 from src.models import EWMA, GARCH11, HAR, Naive
 from src.walkforward import walk_forward
 
@@ -12,6 +13,10 @@ MODEL_FACTORIES = {
     "EWMA": lambda: EWMA(0.94),
     "GARCH": lambda: GARCH11(refit_every=22),
     "HAR": lambda: HAR(),
+    "HAR-log-OLS": lambda: HARLogOLS(),
+    "HAR-log-QLIKE": lambda: HARLogQLIKE(),
+    "Linear-QLIKE-GLM": lambda: LinearQLIKEGLM(refit_every=1),
+    "Linear-QLIKE-GLM-22": lambda: LinearQLIKEGLM(refit_every=22),
 }
 
 
