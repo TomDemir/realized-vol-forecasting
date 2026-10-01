@@ -1,0 +1,4 @@
+# Only needed to run notebooks/ (not used by scripts/ or tests/)
+matplotlib>=3.8
+nbconvert>=7.0
+ipykernel>=6.0

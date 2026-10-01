@@ -1,0 +1,18 @@
+{
+  "oos_start": "2020-01-01",
+  "oos_end": "2026-08-31",
+  "n_targets": 2435,
+  "n_flagged_targets": 12,
+  "n_not_evaluable_forecasts": {
+    "Naive": 0,
+    "EWMA": 0,
+    "GARCH": 0,
+    "HAR": 0
+  },
+  "n_evaluable_common": 2423,
+  "har_n_floored": 0,
+  "har_floored_dates": [],
+  "har_eps_floor": 1e-08,
+  "garch_n_refits": 111,
+  "garch_nonzero_convergence_flags": 0
+}
