@@ -66,6 +66,10 @@ def main():
                 f"Holm p = {r[f'p_holm_{loss}']:.3g}")
 
     chain = abl[abl["step"] > 0]
+    # Test counts are read from the CSVs (number of non-missing p-values), never written by hand.
+    n_chain_tests = int(chain[["p_QLIKE", "p_MSE"]].notna().to_numpy().sum())
+    n_feat_tests = int(feats[["p_QLIKE", "p_MSE"]].notna().to_numpy().sum())
+    n_mse_tests = int(chain["p_MSE"].notna().sum() + feats["p_MSE"].notna().sum())
     sig_lines = holm_lines(chain, "ingredient", fmt_chain)
     feat_lines = holm_lines(feats, "comparison", fmt_feat)
     sr = verdict["seed_qlike_range"]
@@ -89,12 +93,12 @@ def main():
         "",
         md_table(abl_str),
         "",
-        "Main chain, Holm-adjusted within the family of its 8 DM tests:",
+        f"Main chain, Holm-adjusted within the family of its {n_chain_tests} DM tests:",
         "",
         *sig_lines,
         "",
         "`results/ablation_features.csv` (decomposition of step 3; d = loss(model) - loss(vs); "
-        "Holm within the family of its 8 DM tests)",
+        f"Holm within the family of its {n_feat_tests} DM tests)",
         "",
         md_table(feats_str),
         "",
@@ -155,6 +159,7 @@ def main():
     sig_chain = chain[chain["p_holm_QLIKE"] < ALPHA]
     non_chain = chain[chain["p_holm_QLIKE"] >= ALPHA]
     sig_mse = int((chain["p_holm_MSE"] < ALPHA).sum() + (feats["p_holm_MSE"] < ALPHA).sum())
+    assert sig_mse <= n_mse_tests
     fa = feats.set_index("comparison")
     over_num = pd.read_csv(ROOT / "results" / "overforecast.csv").set_index("model")
     diag = pd.read_csv(ROOT / "results" / f"diagnostic_{DIAG_DAY}.csv", parse_dates=["date"]).set_index("date")
@@ -176,7 +181,8 @@ def main():
         f"{fa.loc['a', 'p_holm_QLIKE']:.2g}) and on top of the returns (Holm p = {fa.loc['c vs b', 'p_holm_QLIKE']:.2g}); "
         f"adding r_t and min(r_t, 0) is not, alone (Holm p = {fa.loc['b', 'p_holm_QLIKE']:.2g}) or on top of the "
         f"weekday (Holm p = {fa.loc['c vs a', 'p_holm_QLIKE']:.2g}).",
-        f"- {sig_mse} of the 16 ablation comparisons on MSE are significant after Holm.",
+        f"- {sig_mse} of the {n_mse_tests} ablation comparisons on MSE ({int(chain['p_MSE'].notna().sum())} in the "
+        f"chain, {int(feats['p_MSE'].notna().sum())} in the feature decomposition) are significant after Holm.",
         f"- Under the decision rule, the MLP result is negative: MLP-QLIKE does not beat Linear-QLIKE on QLIKE "
         f"(DM {mlp_lin.dm_stat:.2f}, p = {mlp_lin.p_value:.2f}).",
         f"- Limits: one asset (BTCUSDT spot) traded 24/7; the 10 worst days account for {conc_min:.1%} to "
@@ -195,7 +201,8 @@ def main():
         f"- 1m bars: {int(diag_raw.loc[DIAG_DAY, 'n_1m_bars'])}; high-low range "
         f"{diag_raw.loc[DIAG_DAY, 'high_low_range_pct']:.2f} %; volume {diag_raw.loc[DIAG_DAY, 'volume_btc']:.0f} BTC "
         f"({diag_raw.loc[prev_day, 'volume_btc']:.0f} BTC on {prev_day:%Y-%m-%d}); "
-        f"{int(diag_raw.loc[DIAG_DAY, 'n_zero_5m_close_changes'])} of the 287 within-day changes between "
+        f"{int(diag_raw.loc[DIAG_DAY, 'n_zero_5m_close_changes'])} of the "
+        f"{int(diag_raw.loc[DIAG_DAY, 'n_5m_close_changes'])} within-day changes between "
         "consecutive 5-min grid closes are zero.",
         f"- Every model's forecast exceeds `rv5`: ratios from {diag_fc.ratio.min():.1f} "
         f"({diag_fc.loc[diag_fc.ratio.idxmin(), 'model']}) to {diag_fc.ratio.max():.1f} "

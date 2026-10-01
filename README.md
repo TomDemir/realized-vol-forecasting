@@ -7,7 +7,7 @@ Daily realized volatility forecasting on crypto from 5-minute returns: naive, EW
 - Over 2423 evaluable out-of-sample days (2020-01-01 to 2026-08-31), mean QLIKE ranges from 0.2827 (Linear-QLIKE-GLM) to 0.4836 (Naive); HAR has 0.3763.
 - In the ablation chain from HAR to MLP-QLIKE, the only step with a Holm-adjusted p-value below 0.05 on QLIKE is + inputs (r, min(r,0), weekday) (Holm p = 3.9e-22); + log (Holm p = 0.25), + QLIKE loss (Holm p = 1), + non-linearity (Holm p = 0.81) are not significant.
 - Within that step, adding the weekday of t+1 is significant on QLIKE, alone (Holm p = 2.1e-28) and on top of the returns (Holm p = 4.2e-25); adding r_t and min(r_t, 0) is not, alone (Holm p = 1) or on top of the weekday (Holm p = 1).
-- 0 of the 16 ablation comparisons on MSE are significant after Holm.
+- 0 of the 8 ablation comparisons on MSE (4 in the chain, 4 in the feature decomposition) are significant after Holm.
 - Under the decision rule, the MLP result is negative: MLP-QLIKE does not beat Linear-QLIKE on QLIKE (DM 0.48, p = 0.63).
 - Limits: one asset (BTCUSDT spot) traded 24/7; the 10 worst days account for 81.5% to 99.0% of each model's squared error; the largest forecast / realized ratio is 81.6 (GARCH, 2023-08-12).
 <!-- summary:end -->
@@ -126,8 +126,8 @@ Step 3 of the chain is split with the same Gamma GLM (daily, standardized inputs
 against b, for QLIKE and MSE.
 
 Holm adjustment is applied per family: the main chain is one family and the feature
-decomposition is another; each family contains all of its DM tests on QLIKE and MSE (8 tests
-each). In this README, "significant" means a Holm-adjusted p-value below 0.05.
+decomposition is another; each family contains all of its DM tests on QLIKE and MSE (the
+number of tests per family is printed with each table below). In this README, "significant" means a Holm-adjusted p-value below 0.05.
 
 ### Decision rule
 
@@ -322,13 +322,13 @@ Forecasts for the day:
 
 1m-bar statistics, day -2 to day +2:
 
-| date | n_1m_bars | volume_btc | n_trades | high_low_range_pct | n_zero_1m_close_changes | n_zero_5m_close_changes |
-|---|---|---|---|---|---|---|
-| 2023-08-10 | 1440 | 23463.5 | 513691 | 1.42496 | 197 | 4 |
-| 2023-08-11 | 1440 | 20637 | 437828 | 1.06682 | 308 | 10 |
-| 2023-08-12 | 1440 | 8971.48 | 310852 | 0.339635 | 506 | 36 |
-| 2023-08-13 | 1440 | 11101.7 | 341726 | 0.691199 | 458 | 31 |
-| 2023-08-14 | 1440 | 31443.1 | 671592 | 2.03718 | 181 | 11 |
+| date | n_1m_bars | volume_btc | n_trades | high_low_range_pct | n_zero_1m_close_changes | n_5m_close_changes | n_zero_5m_close_changes |
+|---|---|---|---|---|---|---|---|
+| 2023-08-10 | 1440 | 23463.5 | 513691 | 1.42496 | 197 | 287 | 4 |
+| 2023-08-11 | 1440 | 20637 | 437828 | 1.06682 | 308 | 287 | 10 |
+| 2023-08-12 | 1440 | 8971.48 | 310852 | 0.339635 | 506 | 287 | 36 |
+| 2023-08-13 | 1440 | 11101.7 | 341726 | 0.691199 | 458 | 287 | 31 |
+| 2023-08-14 | 1440 | 31443.1 | 671592 | 2.03718 | 181 | 287 | 11 |
 <!-- diag:end -->
 
 ## Limits

@@ -36,6 +36,7 @@ def raw_day_stats(day: pd.Timestamp) -> dict:
     return {"date": day.date(), "n_1m_bars": len(x), "volume_btc": float(x[5].sum()),
             "n_trades": int(x[8].sum()), "high_low_range_pct": float((x[2].max() / x[3].min() - 1) * 100),
             "n_zero_1m_close_changes": int((close.diff() == 0).sum()),
+            "n_5m_close_changes": int(grid.diff().notna().sum()),
             "n_zero_5m_close_changes": int((grid.diff() == 0).sum())}
 
 
