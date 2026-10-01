@@ -69,13 +69,26 @@ def diebold_mariano(loss_model: np.ndarray, loss_bench: np.ndarray) -> dict:
             "sign": int(np.sign(stat))}
 
 
-def dm_table(forecasts: pd.DataFrame, rv: pd.Series, bench: str = "HAR") -> pd.DataFrame:
+def dm_table(forecasts: pd.DataFrame, rv: pd.Series, bench: str = "HAR",
+             pairs: list[tuple[str, str]] | None = None) -> pd.DataFrame:
+    """DM tests for (model, benchmark) pairs; default: every model against `bench`."""
+    if pairs is None:
+        pairs = [(m, bench) for m in forecasts.columns if m != bench]
     rows = []
     for loss_name, fn in LOSSES.items():
-        lb = fn(rv, forecasts[bench])
-        for m in forecasts.columns:
-            if m == bench:
-                continue
-            res = diebold_mariano(fn(rv, forecasts[m]), lb)
-            rows.append({"model": m, "benchmark": bench, "loss": loss_name, **res})
+        for m, b in pairs:
+            res = diebold_mariano(fn(rv, forecasts[m]), fn(rv, forecasts[b]))
+            rows.append({"model": m, "benchmark": b, "loss": loss_name, **res})
+    return pd.DataFrame(rows)
+
+
+def mse_concentration(forecasts: pd.DataFrame, rv: pd.Series, k: int = 10) -> pd.DataFrame:
+    """Share of the total squared error due to the k days with the largest squared error."""
+    rows = []
+    for m in forecasts.columns:
+        se = pd.Series(mse_loss(rv, forecasts[m]), index=forecasts.index)
+        top = se.nlargest(k)
+        rows.append({"model": m, "N": len(se), "MSE": float(se.mean()),
+                     f"top{k}_share": float(top.sum() / se.sum()),
+                     f"top{k}_dates": " ".join(d.strftime("%Y-%m-%d") for d in top.index)})
     return pd.DataFrame(rows)

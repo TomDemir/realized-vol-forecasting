@@ -1,8 +1,8 @@
 #!/usr/bin/env python3
 """Run the baseline walk-forward and write results/.
 
-Outputs: results/forecasts.csv, results/metrics.csv, results/dm_tests.csv,
-results/garch_fits.csv, results/summary.json.
+Outputs: results/forecasts.csv, results/garch_fits.csv, results/summary.json.
+Metrics and DM tests are computed by scripts/evaluate.py.
 """
 from __future__ import annotations
 
@@ -16,7 +16,7 @@ ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT))
 
 from src.data import load_daily  # noqa: E402
-from src.evaluation import common_mask, dm_table, metrics_table  # noqa: E402
+from src.evaluation import common_mask  # noqa: E402
 from src.models import EWMA, GARCH11, HAR, Naive  # noqa: E402
 from src.walkforward import OOS_END, OOS_START, to_wide, walk_forward  # noqa: E402
 
@@ -42,10 +42,6 @@ def main() -> int:
     fc_out.index.name = "date"
     fc_out.to_csv(out / "forecasts.csv", float_format="%.10e")
 
-    metrics = metrics_table(fc[mask], rv[mask])
-    metrics.to_csv(out / "metrics.csv", index=False, float_format="%.6e")
-    dm = dm_table(fc[mask], rv[mask], bench="HAR")
-    dm.to_csv(out / "dm_tests.csv", index=False, float_format="%.6g")
     pd.DataFrame(garch.fit_log).to_csv(out / "garch_fits.csv", index=False)
 
     non_eval = {m: int((~fc[m].notna()).sum()) for m in fc.columns}
@@ -63,10 +59,7 @@ def main() -> int:
     }
     (out / "summary.json").write_text(json.dumps(summary, indent=2))
 
-    pd.set_option("display.width", 200)
-    print("metrics.csv\n", metrics.to_string(index=False), sep="")
-    print("\ndm_tests.csv\n", dm.to_string(index=False), sep="")
-    print("\n" + json.dumps(summary, indent=2))
+    print(json.dumps(summary, indent=2))
     return 0
 
 
