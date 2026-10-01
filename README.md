@@ -1,17 +1,29 @@
 # realized-vol-forecasting
 Daily realized volatility forecasting on crypto from 5-minute returns: naive, EWMA, GARCH(1,1), HAR-RV and one ML model, walk-forward evaluation with QLIKE, MSE and Diebold-Mariano tests.
 
+## Summary
+
+<!-- summary:start -->
+- Over 2423 evaluable out-of-sample days (2020-01-01 to 2026-08-31), mean QLIKE ranges from 0.2827 (Linear-QLIKE-GLM) to 0.4836 (Naive); HAR has 0.3763.
+- In the ablation chain from HAR to MLP-QLIKE, the only step with a Holm-adjusted p-value below 0.05 on QLIKE is + inputs (r, min(r,0), weekday) (Holm p = 3.9e-22); + log (Holm p = 0.25), + QLIKE loss (Holm p = 1), + non-linearity (Holm p = 0.81) are not significant.
+- Within that step, adding the weekday of t+1 is significant on QLIKE, alone (Holm p = 2.1e-28) and on top of the returns (Holm p = 4.2e-25); adding r_t and min(r_t, 0) is not, alone (Holm p = 1) or on top of the weekday (Holm p = 1).
+- 0 of the 16 ablation comparisons on MSE are significant after Holm.
+- Under the decision rule, the MLP result is negative: MLP-QLIKE does not beat Linear-QLIKE on QLIKE (DM 0.48, p = 0.63).
+- Limits: one asset (BTCUSDT spot) traded 24/7; the 10 worst days account for 81.5% to 99.0% of each model's squared error; the largest forecast / realized ratio is 81.6 (GARCH, 2023-08-12).
+<!-- summary:end -->
+
 ## Reproduce
 
 ```bash
-pip install -r requirements.txt            # + requirements-notebook.txt for plots / notebook
+pip install -r requirements.txt -r requirements-notebook.txt   # notebook file: plots and notebook only
 python scripts/download.py                 # BTCUSDT spot 1m klines 2018-01..2026-08 -> data/raw/ (SHA-256 checked, git-ignored)
 python scripts/build_rv.py                 # -> data/derived/btcusdt_rv5_daily.csv (+ btcusdt_rv5_excluded_days.csv)
 python scripts/run_baselines.py            # -> results/forecasts.csv, results/summary.json
 python scripts/run_ml.py --model MLP-QLIKE     # -> results/forecasts_MLP-QLIKE.csv
 python scripts/run_ml.py --model Linear-QLIKE  # -> results/forecasts_Linear-QLIKE.csv
-python scripts/run_ablation.py             # -> results/forecasts_ablation.csv (HAR-log-OLS, HAR-log-QLIKE, Linear-QLIKE-GLM)
-python scripts/evaluate.py                 # -> metrics, DM tests, MSE concentration, seed QLIKE, verdict
+python scripts/run_ablation.py             # -> results/forecasts_ablation.csv (all GLM / log-OLS ablation models)
+python scripts/evaluate.py                 # -> metrics, DM tests, ablation tables (with Holm), MSE concentration, seed QLIKE, verdict
+python scripts/diagnose_day.py --day 2023-08-12   # -> results/diagnostic_2023-08-12*.csv (reads data/raw)
 python scripts/plot_2024.py                # -> results/forecast_vs_realized_2024.png
 python scripts/update_readme_results.py    # copies results/ tables into this README
 pytest
@@ -106,6 +118,17 @@ lag `floor(4 (T/100)^(2/9))`). The last step also changes the estimation procedu
 Adam with early stopping, a 5-seed mean and a refit every 22 origins, while Linear-QLIKE-GLM is an
 exact daily optimum.
 
+### Feature decomposition and multiple testing
+
+Step 3 of the chain is split with the same Gamma GLM (daily, standardized inputs, same days):
+(a) HAR-log-QLIKE + weekday of t+1 only, (b) HAR-log-QLIKE + `r_t` and `min(r_t, 0)` only,
+(c) both, which is Linear-QLIKE-GLM. DM tests: a and b against HAR-log-QLIKE, c against a and
+against b, for QLIKE and MSE.
+
+Holm adjustment is applied per family: the main chain is one family and the feature
+decomposition is another; each family contains all of its DM tests on QLIKE and MSE (8 tests
+each). In this README, "significant" means a Holm-adjusted p-value below 0.05.
+
 ### Decision rule
 
 MLP-QLIKE is declared better only if it beats HAR **and** Linear-QLIKE on QLIKE with p < 0.05
@@ -136,6 +159,8 @@ Newey-West (Bartlett) HAC variance with lag `floor(4 (T/100)^(2/9))`, two-sided 
 | HAR-log-QLIKE | 2423 | 8.711536e-06 | 3.314109e-01 |
 | Linear-QLIKE-GLM | 2423 | 3.107330e-05 | 2.826707e-01 |
 | Linear-QLIKE-GLM-22 | 2423 | 1.221348e-04 | 2.832493e-01 |
+| HAR-log-QLIKE+dow | 2423 | 8.593807e-06 | 2.861613e-01 |
+| HAR-log-QLIKE+ret | 2423 | 2.448886e-05 | 3.285230e-01 |
 
 `results/dm_tests.csv` (d = loss(model) - loss(benchmark))
 
@@ -160,19 +185,34 @@ Newey-West (Bartlett) HAC variance with lag `floor(4 (T/100)^(2/9))`, two-sided 
 
 `results/ablation.csv` (DM against the previous step, d = loss(step) - loss(previous))
 
-| step | model | ingredient | QLIKE | MSE | vs | dm_QLIKE | p_QLIKE | dm_MSE | p_MSE | T | nw_lag |
-|---|---|---|---|---|---|---|---|---|---|---|---|
-| 0 | HAR | HAR (levels, OLS) | 0.376346 | 1.45816e-05 |  |  |  |  |  |  |  |
-| 1 | HAR-log-OLS | + log | 0.331485 | 8.76613e-06 | HAR | -2.09695 | 0.0359976 | -1.02434 | 0.305673 | 2423 | 8 |
-| 2 | HAR-log-QLIKE | + QLIKE loss | 0.331411 | 8.71154e-06 | HAR-log-OLS | -0.00843944 | 0.993266 | -0.622569 | 0.533568 | 2423 | 8 |
-| 3 | Linear-QLIKE-GLM | + inputs (r, min(r,0), weekday) | 0.282671 | 3.10733e-05 | HAR-log-QLIKE | -9.8852 | 4.82606e-23 | 1.01447 | 0.310359 | 2423 | 8 |
-| 4 | MLP-QLIKE | + non-linearity | 0.288738 | 1.74637e-05 | Linear-QLIKE-GLM | 1.49253 | 0.135562 | -1.03032 | 0.302861 | 2423 | 8 |
+| step | model | ingredient | QLIKE | MSE | vs | dm_QLIKE | p_QLIKE | p_holm_QLIKE | dm_MSE | p_MSE | p_holm_MSE | T | nw_lag |
+|---|---|---|---|---|---|---|---|---|---|---|---|---|---|
+| 0 | HAR | HAR (levels, OLS) | 0.376346 | 1.45816e-05 |  |  |  |  |  |  |  |  |  |
+| 1 | HAR-log-OLS | + log | 0.331485 | 8.76613e-06 | HAR | -2.09695 | 0.0359976 | 0.251983 | -1.02434 | 0.305673 | 1 | 2423 | 8 |
+| 2 | HAR-log-QLIKE | + QLIKE loss | 0.331411 | 8.71154e-06 | HAR-log-OLS | -0.00843944 | 0.993266 | 1 | -0.622569 | 0.533568 | 1 | 2423 | 8 |
+| 3 | Linear-QLIKE-GLM | + inputs (r, min(r,0), weekday) | 0.282671 | 3.10733e-05 | HAR-log-QLIKE | -9.8852 | 4.82606e-23 | 3.86085e-22 | 1.01447 | 0.310359 | 1 | 2423 | 8 |
+| 4 | MLP-QLIKE | + non-linearity | 0.288738 | 1.74637e-05 | Linear-QLIKE-GLM | 1.49253 | 0.135562 | 0.813369 | -1.03032 | 0.302861 | 1 | 2423 | 8 |
 
-What the ablation shows (p < 0.05 between consecutive steps only):
+Main chain, Holm-adjusted within the family of its 8 DM tests:
 
-- QLIKE: consecutive steps with p < 0.05: + log (HAR-log-OLS vs HAR, DM -2.097, p = 0.036); + inputs (r, min(r,0), weekday) (Linear-QLIKE-GLM vs HAR-log-QLIKE, DM -9.885, p = 4.83e-23).
-- MSE: no consecutive step with p < 0.05.
-- QLIKE: consecutive steps with p >= 0.05: + QLIKE loss (HAR-log-QLIKE vs HAR-log-OLS, p = 0.993); + non-linearity (MLP-QLIKE vs Linear-QLIKE-GLM, p = 0.136).
+- QLIKE, significant (Holm p < 0.05): + inputs (r, min(r,0), weekday) (Linear-QLIKE-GLM vs HAR-log-QLIKE, DM -9.885, Holm p = 3.86e-22).
+- QLIKE, not significant: + log (HAR-log-OLS vs HAR, DM -2.097, Holm p = 0.252); + QLIKE loss (HAR-log-QLIKE vs HAR-log-OLS, DM -0.008, Holm p = 1); + non-linearity (MLP-QLIKE vs Linear-QLIKE-GLM, DM 1.493, Holm p = 0.813).
+- MSE: no comparison is significant (Holm p < 0.05).
+- MSE, not significant: + log (HAR-log-OLS vs HAR, DM -1.024, Holm p = 1); + QLIKE loss (HAR-log-QLIKE vs HAR-log-OLS, DM -0.623, Holm p = 1); + inputs (r, min(r,0), weekday) (Linear-QLIKE-GLM vs HAR-log-QLIKE, DM 1.014, Holm p = 1); + non-linearity (MLP-QLIKE vs Linear-QLIKE-GLM, DM -1.030, Holm p = 1).
+
+`results/ablation_features.csv` (decomposition of step 3; d = loss(model) - loss(vs); Holm within the family of its 8 DM tests)
+
+| comparison | model | ingredient | vs | QLIKE | QLIKE_vs | MSE | MSE_vs | dm_QLIKE | p_QLIKE | p_holm_QLIKE | dm_MSE | p_MSE | p_holm_MSE | T | nw_lag |
+|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|
+| a | HAR-log-QLIKE+dow | + weekday of t+1 only | HAR-log-QLIKE | 0.286161 | 0.331411 | 8.59381e-06 | 8.71154e-06 | -11.2389 | 2.62629e-29 | 2.10103e-28 | -0.743907 | 0.456933 | 1 | 2423 | 8 |
+| b | HAR-log-QLIKE+ret | + r_t and min(r_t, 0) only | HAR-log-QLIKE | 0.328523 | 0.331411 | 2.44889e-05 | 8.71154e-06 | -0.722526 | 0.469971 | 1 | 1.01095 | 0.312039 | 1 | 2423 | 8 |
+| c vs a | Linear-QLIKE-GLM | both (adds r_t, min(r_t, 0) to a) | HAR-log-QLIKE+dow | 0.282671 | 0.286161 | 3.10733e-05 | 8.59381e-06 | -1.13138 | 0.257896 | 1 | 1.01368 | 0.310734 | 1 | 2423 | 8 |
+| c vs b | Linear-QLIKE-GLM | both (adds weekday to b) | HAR-log-QLIKE+ret | 0.282671 | 0.328523 | 3.10733e-05 | 2.44889e-05 | -10.5349 | 5.96324e-26 | 4.17427e-25 | 1.02288 | 0.306365 | 1 | 2423 | 8 |
+
+- QLIKE, significant (Holm p < 0.05): a: HAR-log-QLIKE+dow vs HAR-log-QLIKE (+ weekday of t+1 only), DM -11.239, Holm p = 2.1e-28; c vs b: Linear-QLIKE-GLM vs HAR-log-QLIKE+ret (both (adds weekday to b)), DM -10.535, Holm p = 4.17e-25.
+- QLIKE, not significant: b: HAR-log-QLIKE+ret vs HAR-log-QLIKE (+ r_t and min(r_t, 0) only), DM -0.723, Holm p = 1; c vs a: Linear-QLIKE-GLM vs HAR-log-QLIKE+dow (both (adds r_t, min(r_t, 0) to a)), DM -1.131, Holm p = 1.
+- MSE: no comparison is significant (Holm p < 0.05).
+- MSE, not significant: a: HAR-log-QLIKE+dow vs HAR-log-QLIKE (+ weekday of t+1 only), DM -0.744, Holm p = 1; b: HAR-log-QLIKE+ret vs HAR-log-QLIKE (+ r_t and min(r_t, 0) only), DM 1.011, Holm p = 1; c vs a: Linear-QLIKE-GLM vs HAR-log-QLIKE+dow (both (adds r_t, min(r_t, 0) to a)), DM 1.014, Holm p = 1; c vs b: Linear-QLIKE-GLM vs HAR-log-QLIKE+ret (both (adds weekday to b)), DM 1.023, Holm p = 1.
 
 `results/adam_vs_glm.csv` (Linear-QLIKE trained by Adam vs the same model solved by the Gamma GLM; d = loss(Adam) - loss(GLM); relative difference = |h_Adam / h_GLM - 1|)
 
@@ -222,6 +262,8 @@ Single-seed QLIKE range (min, max): MLP-QLIKE 2.865596e-01 to 3.009313e-01; Line
 | HAR-log-QLIKE | 2423 | 8.71154e-06 | 0.860003 | 2020-03-13 2021-05-19 2020-03-12 2020-03-14 2021-01-11 2021-09-07 2021-02-23 2021-01-29 2024-08-05 2020-05-10 |
 | Linear-QLIKE-GLM | 2423 | 3.10733e-05 | 0.960432 | 2020-03-13 2021-05-19 2020-03-12 2021-05-20 2021-01-11 2021-09-07 2020-03-14 2021-02-23 2020-03-17 2020-05-10 |
 | Linear-QLIKE-GLM-22 | 2423 | 0.000122135 | 0.989929 | 2020-03-13 2021-05-19 2020-03-12 2021-05-20 2021-01-11 2021-09-07 2020-03-14 2021-02-23 2020-05-10 2024-08-05 |
+| HAR-log-QLIKE+dow | 2423 | 8.59381e-06 | 0.858223 | 2020-03-13 2021-05-19 2020-03-12 2021-01-11 2021-09-07 2021-05-20 2021-02-23 2020-03-17 2020-03-14 2021-01-29 |
+| HAR-log-QLIKE+ret | 2423 | 2.44889e-05 | 0.950831 | 2020-03-13 2021-05-19 2020-03-12 2020-03-14 2021-01-11 2021-09-07 2021-05-20 2021-02-23 2024-08-05 2020-05-10 |
 
 `results/summary.json`
 
@@ -236,6 +278,58 @@ Single-seed QLIKE range (min, max): MLP-QLIKE 2.865596e-01 to 3.009313e-01; Line
 
 ![HAR and GARCH forecasts vs realized RV, 2024](results/forecast_vs_realized_2024.png)
 <!-- results:end -->
+
+## Diagnostic: 2023-08-12
+
+<!-- diag:start -->
+Observed for target day 2023-08-12 (Saturday), from `results/diagnostic_2023-08-12*.csv`:
+
+- `rv5` = 8.293e-06, the lowest of the 2435 out-of-sample days (rank 1); `n_obs` = 288, `n_missing` = 0, `flag` = False.
+- 1m bars: 1440; high-low range 0.34 %; volume 8971 BTC (20637 BTC on 2023-08-11); 36 of the 287 within-day changes between consecutive 5-min grid closes are zero.
+- Every model's forecast exceeds `rv5`: ratios from 7.8 (Naive) to 81.6 (GARCH).
+
+Daily values, day -5 to day +5:
+
+| date | weekday | rv5 | n_obs | n_missing | flag | ret | rv5_rank_in_oos_lowest_first |
+|---|---|---|---|---|---|---|---|
+| 2023-08-07 | Monday | 0.000165309 | 288 | 0 | False | 0.00420725 | 265 |
+| 2023-08-08 | Tuesday | 0.000302378 | 288 | 0 | False | 0.0189679 | 594 |
+| 2023-08-09 | Wednesday | 0.000220024 | 288 | 0 | False | -0.00634955 | 397 |
+| 2023-08-10 | Thursday | 0.000108393 | 288 | 0 | False | -0.00427659 | 138 |
+| 2023-08-11 | Friday | 6.50183e-05 | 288 | 0 | False | -0.00100948 | 59 |
+| 2023-08-12 | Saturday | 8.29288e-06 | 288 | 0 | False | 0.000140682 | 1 |
+| 2023-08-13 | Sunday | 1.73182e-05 | 288 | 0 | False | -0.00430177 | 3 |
+| 2023-08-14 | Monday | 0.000116286 | 288 | 0 | False | 0.0043276 | 160 |
+| 2023-08-15 | Tuesday | 0.000104008 | 288 | 0 | False | -0.00787745 | 129 |
+| 2023-08-16 | Wednesday | 0.000134433 | 288 | 0 | False | -0.0162091 | 201 |
+| 2023-08-17 | Thursday | 0.0101963 | 288 | 0 | False | -0.0761687 | 2416 |
+
+Forecasts for the day:
+
+| model | forecast | realized_rv5 | ratio |
+|---|---|---|---|
+| Naive | 6.50183e-05 | 8.29288e-06 | 7.84025 |
+| EWMA | 0.000138361 | 8.29288e-06 | 16.6844 |
+| GARCH | 0.000676776 | 8.29288e-06 | 81.6093 |
+| HAR | 0.000532337 | 8.29288e-06 | 64.1921 |
+| HAR-log-OLS | 0.000142477 | 8.29288e-06 | 17.1806 |
+| HAR-log-QLIKE | 0.000205699 | 8.29288e-06 | 24.8043 |
+| HAR-log-QLIKE+dow | 0.000120532 | 8.29288e-06 | 14.5344 |
+| HAR-log-QLIKE+ret | 0.00022325 | 8.29288e-06 | 26.9207 |
+| Linear-QLIKE-GLM | 0.000131765 | 8.29288e-06 | 15.8889 |
+| Linear-QLIKE | 0.000144914 | 8.29288e-06 | 17.4745 |
+| MLP-QLIKE | 0.000116797 | 8.29288e-06 | 14.084 |
+
+1m-bar statistics, day -2 to day +2:
+
+| date | n_1m_bars | volume_btc | n_trades | high_low_range_pct | n_zero_1m_close_changes | n_zero_5m_close_changes |
+|---|---|---|---|---|---|---|
+| 2023-08-10 | 1440 | 23463.5 | 513691 | 1.42496 | 197 | 4 |
+| 2023-08-11 | 1440 | 20637 | 437828 | 1.06682 | 308 | 10 |
+| 2023-08-12 | 1440 | 8971.48 | 310852 | 0.339635 | 506 | 36 |
+| 2023-08-13 | 1440 | 11101.7 | 341726 | 0.691199 | 458 | 31 |
+| 2023-08-14 | 1440 | 31443.1 | 671592 | 2.03718 | 181 | 11 |
+<!-- diag:end -->
 
 ## Limits
 
@@ -254,6 +348,8 @@ Single-seed QLIKE range (min, max): MLP-QLIKE 2.865596e-01 to 3.009313e-01; Line
 | HAR-log-QLIKE | 24.8 | 2023-08-12 | 0.1233 | 4.111 | 1.245 | 0.6039 | 2.742 | 1.608 | 0.95 | 0.4766 |
 | Linear-QLIKE-GLM | 15.89 | 2023-08-12 | 3.271 | 3.375 | 1.346 | 0.6195 | 2.984 | 2.163 | 1.025 | 0.9177 |
 | Linear-QLIKE-GLM-22 | 16.54 | 2023-08-12 | 5.819 | 3.341 | 1.357 | 0.5629 | 2.756 | 2.066 | 0.7499 | 1.118 |
+| HAR-log-QLIKE+dow | 14.53 | 2023-08-12 | 0.1246 | 2.748 | 1.062 | 0.7015 | 3.388 | 1.933 | 1.21 | 0.5075 |
+| HAR-log-QLIKE+ret | 26.92 | 2023-08-12 | 2.963 | 4.505 | 1.543 | 0.5307 | 2.543 | 1.745 | 0.7299 | 0.8068 |
 
 - **MSE concentration.** The 10 worst days account for between 81.5% and 99.0% of each model's total squared error (`results/mse_concentration.csv`, table above).
 - **Market.** Crypto spot data only, traded 24/7: no market closures, overnight gaps or weekends of the kind found in equity or futures markets.

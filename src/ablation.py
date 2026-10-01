@@ -98,10 +98,23 @@ class HARLogQLIKE(BaseModel):
         self._forecast = np.exp(self.coef[0] + x_t @ self.coef[1:]) if np.isfinite(x_t).all() else np.nan
 
 
+HAR_LOG_COLS = ["log_rv_d", "log_rv_w", "log_rv_m"]
+DOW_COLS = [f"dow_{k}" for k in range(6)]  # dow_6 is the reference category
+RET_COLS = ["r", "r_neg"]
+FEATURE_SETS = {
+    "HAR-log-QLIKE+dow": HAR_LOG_COLS + DOW_COLS,
+    "HAR-log-QLIKE+ret": HAR_LOG_COLS + RET_COLS,
+}
+
+
 class LinearQLIKEGLM(BaseModel):
-    def __init__(self, refit_every: int = 1, name: str | None = None):
+    """Gamma GLM (log link) on standardized inputs. `features=None` uses the
+    12 Linear-QLIKE inputs minus the reference dummy; otherwise a column subset."""
+
+    def __init__(self, refit_every: int = 1, name: str | None = None, features: list[str] | None = None):
         super().__init__()
         self.refit_every = refit_every
+        self.features = features
         self.name = name or ("Linear-QLIKE-GLM" if refit_every == 1 else f"Linear-QLIKE-GLM-{refit_every}")
         self.n_calls = 0
         self.coef = None
@@ -111,6 +124,8 @@ class LinearQLIKEGLM(BaseModel):
 
     def _fit(self, hist):
         X = make_features(hist).drop(columns=GLM_DROP)
+        if self.features is not None:
+            X = X[self.features]
         if self.n_calls % self.refit_every == 0 or self.coef is None:
             Xtr, ytr, _ = _rows(hist, X)
             self.mu = Xtr.mean(axis=0)
@@ -127,3 +142,7 @@ class LinearQLIKEGLM(BaseModel):
             self._forecast = np.nan
             return
         self._forecast = float(np.exp(self.coef[0] + ((x_t - self.mu) / self.sd) @ self.coef[1:]))
+
+
+def feature_subset_models() -> list[LinearQLIKEGLM]:
+    return [LinearQLIKEGLM(refit_every=1, name=n, features=cols) for n, cols in FEATURE_SETS.items()]

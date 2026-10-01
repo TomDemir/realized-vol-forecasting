@@ -104,3 +104,26 @@ def test_linear_glm_standardization_and_refit():
     np.testing.assert_array_equal(mus[0], mus[21])
     assert not np.array_equal(mus[21], mus[22])
     assert m.n_refits == 2 and m.n_not_converged == 0
+
+
+def test_feature_subsets_use_the_right_columns():
+    from src.ablation import FEATURE_SETS, feature_subset_models
+    df = synthetic_daily()
+    hist = df.loc[:"2020-04-30"]
+    for m in feature_subset_models():
+        m.fit(hist)
+        cols = FEATURE_SETS[m.name]
+        assert len(m.coef) == 1 + len(cols) and len(m.mu) == len(cols)
+        X = make_features(hist)[cols]
+        Xtr, _, _ = _rows(hist, X)
+        np.testing.assert_array_equal(m.mu, Xtr.mean(axis=0))
+    assert FEATURE_SETS["HAR-log-QLIKE+dow"][:3] == ["log_rv_d", "log_rv_w", "log_rv_m"]
+    assert "dow_6" not in FEATURE_SETS["HAR-log-QLIKE+dow"]
+    assert FEATURE_SETS["HAR-log-QLIKE+ret"][3:] == ["r", "r_neg"]
+
+
+def test_har_log_inputs_identical_in_both_feature_builders():
+    df = synthetic_daily()
+    a = har_log_features(df).to_numpy()
+    b = make_features(df)[["log_rv_d", "log_rv_w", "log_rv_m"]].to_numpy()
+    np.testing.assert_array_equal(a, b)

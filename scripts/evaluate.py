@@ -5,7 +5,10 @@ Inputs: results/forecasts.csv (baselines, with the `evaluable` mask) and
 results/forecasts_MLP-QLIKE.csv, results/forecasts_Linear-QLIKE.csv.
 Outputs: results/metrics.csv, results/dm_tests.csv, results/mse_concentration.csv,
 results/seed_qlike.csv, results/verdict.json, results/ablation.csv,
-results/adam_vs_glm.csv, results/overforecast.csv.
+results/adam_vs_glm.csv, results/overforecast.csv, results/ablation_features.csv.
+
+Holm adjustment: one family per table (main chain; feature decomposition),
+each family holding all of its DM tests on both losses (QLIKE and MSE).
 """
 from __future__ import annotations
 
@@ -19,15 +22,49 @@ import pandas as pd
 ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT))
 
-from src.evaluation import (diebold_mariano, dm_table, metrics_table, mse_concentration,  # noqa: E402
-                            mse_loss, qlike_loss)
+from src.evaluation import (diebold_mariano, dm_table, holm, metrics_table,  # noqa: E402
+                            mse_concentration, mse_loss, qlike_loss)
 
 BASE = ["Naive", "EWMA", "GARCH", "HAR"]
 ML = ["MLP-QLIKE", "Linear-QLIKE"]
 PAIRS = [("Naive", "HAR"), ("EWMA", "HAR"), ("GARCH", "HAR"),
          ("MLP-QLIKE", "HAR"), ("MLP-QLIKE", "Linear-QLIKE"), ("Linear-QLIKE", "HAR")]
 ALPHA = 0.05
-ABL = ["HAR-log-OLS", "HAR-log-QLIKE", "Linear-QLIKE-GLM", "Linear-QLIKE-GLM-22"]
+ABL = ["HAR-log-OLS", "HAR-log-QLIKE", "Linear-QLIKE-GLM", "Linear-QLIKE-GLM-22",
+       "HAR-log-QLIKE+dow", "HAR-log-QLIKE+ret"]
+FEATURE_STEPS = [
+    ("a", "HAR-log-QLIKE+dow", "+ weekday of t+1 only", "HAR-log-QLIKE"),
+    ("b", "HAR-log-QLIKE+ret", "+ r_t and min(r_t, 0) only", "HAR-log-QLIKE"),
+    ("c vs a", "Linear-QLIKE-GLM", "both (adds r_t, min(r_t, 0) to a)", "HAR-log-QLIKE+dow"),
+    ("c vs b", "Linear-QLIKE-GLM", "both (adds weekday to b)", "HAR-log-QLIKE+ret"),
+]
+
+
+def add_holm(table: pd.DataFrame) -> pd.DataFrame:
+    """Holm over all DM p-values of the table (QLIKE and MSE together = one family)."""
+    out = table.copy()
+    p = np.concatenate([out["p_QLIKE"].to_numpy(float), out["p_MSE"].to_numpy(float)])
+    adj = holm(p)
+    n = len(out)
+    out.insert(out.columns.get_loc("p_QLIKE") + 1, "p_holm_QLIKE", adj[:n])
+    out.insert(out.columns.get_loc("p_MSE") + 1, "p_holm_MSE", adj[n:])
+    return out
+
+
+def feature_table(F: pd.DataFrame, rv: pd.Series) -> pd.DataFrame:
+    rows = []
+    for label, m, ingredient, prev in FEATURE_STEPS:
+        row = {"comparison": label, "model": m, "ingredient": ingredient, "vs": prev,
+               "QLIKE": float(qlike_loss(rv, F[m]).mean()), "MSE": float(mse_loss(rv, F[m]).mean()),
+               "QLIKE_vs": float(qlike_loss(rv, F[prev]).mean()), "MSE_vs": float(mse_loss(rv, F[prev]).mean())}
+        for name, fn in (("QLIKE", qlike_loss), ("MSE", mse_loss)):
+            r = diebold_mariano(fn(rv, F[m]), fn(rv, F[prev]))
+            row[f"dm_{name}"], row[f"p_{name}"] = r["dm_stat"], r["p_value"]
+            row["T"], row["nw_lag"] = r["T"], r["nw_lag"]
+        rows.append(row)
+    cols = ["comparison", "model", "ingredient", "vs", "QLIKE", "QLIKE_vs", "MSE", "MSE_vs",
+            "dm_QLIKE", "p_QLIKE", "dm_MSE", "p_MSE", "T", "nw_lag"]
+    return add_holm(pd.DataFrame(rows)[cols])
 CHAIN = [("HAR", "HAR (levels, OLS)"), ("HAR-log-OLS", "+ log"), ("HAR-log-QLIKE", "+ QLIKE loss"),
          ("Linear-QLIKE-GLM", "+ inputs (r, min(r,0), weekday)"), ("MLP-QLIKE", "+ non-linearity")]
 OVER_DAYS = ("2020-03-13", "2020-03-20")
@@ -117,7 +154,9 @@ def main() -> int:
     seed_df = pd.DataFrame(seed_rows)
     seed_df.to_csv(res / "seed_qlike.csv", index=False, float_format="%.6e")
 
-    ablation = ablation_table(F, rv)
+    ablation = add_holm(ablation_table(F, rv))
+    feats = feature_table(F, rv)
+    feats.to_csv(res / "ablation_features.csv", index=False, float_format="%.6g")
     ablation.to_csv(res / "ablation.csv", index=False, float_format="%.6g")
     avg = adam_vs_glm(F, rv, seeds["Linear-QLIKE"].loc[mask])
     avg.to_csv(res / "adam_vs_glm.csv", index=False, float_format="%.6g")
@@ -143,6 +182,7 @@ def main() -> int:
     print("\nseed_qlike.csv\n" + seed_df.to_string(index=False))
     print("\n" + json.dumps(verdict, indent=2))
     print("\nablation.csv\n" + ablation.to_string(index=False))
+    print("\nablation_features.csv\n" + feats.to_string(index=False))
     print("\nadam_vs_glm.csv\n" + avg.to_string(index=False))
     print("\noverforecast.csv\n" + over.to_string(index=False))
     return 0

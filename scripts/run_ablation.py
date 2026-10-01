@@ -11,7 +11,7 @@ from pathlib import Path
 ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT))
 
-from src.ablation import HARLogOLS, HARLogQLIKE, LinearQLIKEGLM  # noqa: E402
+from src.ablation import HARLogOLS, HARLogQLIKE, LinearQLIKEGLM, feature_subset_models  # noqa: E402
 from src.data import load_daily  # noqa: E402
 from src.walkforward import OOS_END, OOS_START, to_wide, walk_forward  # noqa: E402
 
@@ -19,7 +19,8 @@ from src.walkforward import OOS_END, OOS_START, to_wide, walk_forward  # noqa: E
 def main() -> int:
     t0 = time.time()
     df = load_daily()
-    models = [HARLogOLS(), HARLogQLIKE(), LinearQLIKEGLM(refit_every=1), LinearQLIKEGLM(refit_every=22)]
+    models = [HARLogOLS(), HARLogQLIKE(), LinearQLIKEGLM(refit_every=1), LinearQLIKEGLM(refit_every=22),
+              *feature_subset_models()]
     long = walk_forward(df, models, OOS_START, OOS_END)
     assert (long["target_date"] > long["data_end"]).all()
     fc = to_wide(long)[[m.name for m in models]]

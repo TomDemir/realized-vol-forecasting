@@ -92,3 +92,20 @@ def mse_concentration(forecasts: pd.DataFrame, rv: pd.Series, k: int = 10) -> pd
                      f"top{k}_share": float(top.sum() / se.sum()),
                      f"top{k}_dates": " ".join(d.strftime("%Y-%m-%d") for d in top.index)})
     return pd.DataFrame(rows)
+
+
+def holm(pvalues) -> np.ndarray:
+    """Holm step-down adjusted p-values (family-wise error), NaN entries ignored."""
+    p = np.asarray(pvalues, float)
+    out = np.full_like(p, np.nan)
+    ok = ~np.isnan(p)
+    pv = p[ok]
+    m = len(pv)
+    order = np.argsort(pv)
+    adj = np.empty(m)
+    running = 0.0
+    for rank, idx in enumerate(order):
+        running = max(running, (m - rank) * pv[idx])
+        adj[idx] = min(1.0, running)
+    out[ok] = adj
+    return out
