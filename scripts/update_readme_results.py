@@ -155,6 +155,7 @@ def main():
     sig_chain = chain[chain["p_holm_QLIKE"] < ALPHA]
     non_chain = chain[chain["p_holm_QLIKE"] >= ALPHA]
     sig_mse = int((chain["p_holm_MSE"] < ALPHA).sum() + (feats["p_holm_MSE"] < ALPHA).sum())
+    n_mse = int(chain["p_holm_MSE"].notna().sum() + feats["p_holm_MSE"].notna().sum())
     fa = feats.set_index("comparison")
     over_num = pd.read_csv(ROOT / "results" / "overforecast.csv").set_index("model")
     diag = pd.read_csv(ROOT / "results" / f"diagnostic_{DIAG_DAY}.csv", parse_dates=["date"]).set_index("date")
@@ -176,7 +177,7 @@ def main():
         f"{fa.loc['a', 'p_holm_QLIKE']:.2g}) and on top of the returns (Holm p = {fa.loc['c vs b', 'p_holm_QLIKE']:.2g}); "
         f"adding r_t and min(r_t, 0) is not, alone (Holm p = {fa.loc['b', 'p_holm_QLIKE']:.2g}) or on top of the "
         f"weekday (Holm p = {fa.loc['c vs a', 'p_holm_QLIKE']:.2g}).",
-        f"- {sig_mse} of the 16 ablation comparisons on MSE are significant after Holm.",
+        f"- {sig_mse} of the {n_mse} ablation comparisons on MSE are significant after Holm.",
         f"- Under the decision rule, the MLP result is negative: MLP-QLIKE does not beat Linear-QLIKE on QLIKE "
         f"(DM {mlp_lin.dm_stat:.2f}, p = {mlp_lin.p_value:.2f}).",
         f"- Limits: one asset (BTCUSDT spot) traded 24/7; the 10 worst days account for {conc_min:.1%} to "

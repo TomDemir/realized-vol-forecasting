@@ -7,7 +7,7 @@ Daily realized volatility forecasting on crypto from 5-minute returns: naive, EW
 - Over 2423 evaluable out-of-sample days (2020-01-01 to 2026-08-31), mean QLIKE ranges from 0.2827 (Linear-QLIKE-GLM) to 0.4836 (Naive); HAR has 0.3763.
 - In the ablation chain from HAR to MLP-QLIKE, the only step with a Holm-adjusted p-value below 0.05 on QLIKE is + inputs (r, min(r,0), weekday) (Holm p = 3.9e-22); + log (Holm p = 0.25), + QLIKE loss (Holm p = 1), + non-linearity (Holm p = 0.81) are not significant.
 - Within that step, adding the weekday of t+1 is significant on QLIKE, alone (Holm p = 2.1e-28) and on top of the returns (Holm p = 4.2e-25); adding r_t and min(r_t, 0) is not, alone (Holm p = 1) or on top of the weekday (Holm p = 1).
-- 0 of the 16 ablation comparisons on MSE are significant after Holm.
+- 0 of the 8 ablation comparisons on MSE are significant after Holm.
 - Under the decision rule, the MLP result is negative: MLP-QLIKE does not beat Linear-QLIKE on QLIKE (DM 0.48, p = 0.63).
 - Limits: one asset (BTCUSDT spot) traded 24/7; the 10 worst days account for 81.5% to 99.0% of each model's squared error; the largest forecast / realized ratio is 81.6 (GARCH, 2023-08-12).
 <!-- summary:end -->
